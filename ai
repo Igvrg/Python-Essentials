@@ -1,0 +1,158 @@
+# Zawartość pliku: script.py
+
+import json
+import tkinter as tk
+import customtkinter as ctk
+
+# Ustawienia motywu graficznego (Ciemny i Niebieski)
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
+
+
+class ChatbotApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        # Konfiguracja głównego okna aplikacji
+        self.title("IGOR_AI.sys - Chatbot")
+        self.geometry("750x550")
+        self.configure(fg_color="#0B0C10")  # Głęboka czerń jako tło aplikacji
+
+        # Ładowanie startowej bazy danych
+        self.baza_wiedzy = self.wczytaj_baze()
+
+        # --- ARCHITEKTURA INTERFEJSU (LAYOUT) ---
+
+        # 1. LEWY PANEL BOCZNY (Sidebar)
+        self.sidebar = ctk.CTkFrame(self, width=180, corner_radius=0, fg_color="#1F2833")
+        self.sidebar.pack(side="left", fill="y")
+
+        self.logo_label = ctk.CTkLabel(self.sidebar, text="IGOR_AI.sys", font=ctk.CTkFont(size=18, weight="bold"),
+                                       text_color="#66FCF1")
+        self.logo_label.pack(padx=20, pady=20)
+
+        # Przycisk dodawania haseł (Tryb Nauki)
+        self.btn_add = ctk.CTkButton(self.sidebar, text="⚙️ Ucz bota", fg_color="transparent", border_color="#45A29E",
+                                     border_width=2, text_color="#C5C6C7", hover_color="#1F2833",
+                                     command=self.otworz_okno_nauki)
+        self.btn_add.pack(padx=20, pady=10, fill="x")
+
+        # Przycisk czyszczenia historii rozmowy
+        self.btn_clear = ctk.CTkButton(self.sidebar, text="🔴 Clear Chat", fg_color="transparent",
+                                       border_color="#FF4B4B", border_width=2, text_color="#C5C6C7",
+                                       hover_color="#1F2833", command=self.wyczysc_czat)
+        self.btn_clear.pack(padx=20, pady=10, fill="x")
+
+        self.info_label = ctk.CTkLabel(self.sidebar, text=f"Baza haseł: {len(self.baza_wiedzy)}",
+                                       font=ctk.CTkFont(size=11), text_color="#A5A6A7")
+        self.info_label.pack(side="bottom", pady=20)
+
+        # 2. CENTRALNE OKNO CZATU (Główny ekran tekstowy)
+        self.chat_display = ctk.CTkTextbox(self, corner_radius=8, fg_color="#1F2833", text_color="#C5C6C7",
+                                           font=ctk.CTkFont(size=13))
+        self.chat_display.pack(padx=20, pady=(20, 10), fill="both", expand=True)
+        self.chat_display.configure(state="disabled")  # Blokada edycji ręcznej przez użytkownika
+
+        # 3. DOLNY PASEK WPISYWANIA
+        self.input_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.input_frame.pack(padx=20, pady=(0, 20), fill="x")
+
+        self.entry_box = ctk.CTkEntry(self.input_frame, placeholder_text="Zadaj mi pytanie...", fg_color="#1F2833",
+                                      text_color="#C5C6C7", border_color="#45A29E", corner_radius=8)
+        self.entry_box.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.entry_box.bind("<Return>", lambda event: self.wyslij_wiadomosc())  # Wyślij po kliknięciu Enter
+
+        self.btn_send = ctk.CTkButton(self.input_frame, text="Wyślij", width=80, fg_color="#45A29E",
+                                      text_color="#0B0C10", font=ctk.CTkFont(weight="bold"), hover_color="#66FCF1",
+                                      command=self.wyslij_wiadomosc)
+        self.btn_send.pack(side="right")
+
+        # Powitanie startowe bota w oknie
+        self.wypisz_w_oknie("Bot", "Witaj w moim nowym interfejsie graficznym! Zapytaj mnie o cokolwiek.",
+                            color="#66FCF1")
+
+    # --- FUNKCJE LOGICZNE PROGRAMU ---
+
+    def wczytaj_baze(self):
+        try:
+            with open("baza.json", "r", encoding="utf-8") as plik:
+                return json.load(plik)
+        except FileNotFoundError:
+            return {}
+
+    def zapisz_baze(self):
+        with open("baza.json", "w", encoding="utf-8") as plik:
+            json.dump(self.baza_wiedzy, plik, indent=4, ensure_ascii=False)
+
+    def wypisz_w_oknie(self, autor, tekst, color="#C5C6C7"):
+        self.chat_display.configure(state="normal")
+        self.chat_display.insert(tk.END, f"{autor}: {tekst}\n\n", (autor,))
+        self.chat_display.tag_config(autor, foreground=color)
+        self.chat_display.configure(state="disabled")
+        self.chat_display.see(tk.END)  # Automatyczne przewijanie na dół
+
+    def wyslij_wiadomosc(self):
+        tekst_uzytkownika = self.entry_box.get().strip()
+        if not tekst_uzytkownika:
+            return
+
+        # Czyszczenie pola wprowadzania
+        self.entry_box.delete(0, tk.END)
+
+        # Wypisanie wiadomości użytkownika
+        self.wypisz_w_oknie("Ty", tekst_uzytkownika, color="#FFFFFF")
+
+        # Analiza i odpowiedź bota
+        odpowiedz = self.analizuj_pytanie(tekst_uzytkownika)
+        self.wypisz_w_oknie("Bot", odpowiedz, color="#66FCF1")
+
+    def analizuj_pytanie(self, pytanie):
+        pytanie_bez_spacji = pytanie.lower().replace(" ", "")
+        for klucz, odpowiedz in self.baza_wiedzy.items():
+            klucz_bez_spacji = klucz.replace(" ", "")
+            if klucz_bez_spacji in pytanie_bez_spacji:
+                return odpowiedz
+        return "Przepraszam, jeszcze nie rozumiem tego pytania. Użyj przycisku 'Ucz bota' po lewej stronie, aby mnie tego nauczyć!"
+
+    def wyczysc_czat(self):
+        self.chat_display.configure(state="normal")
+        self.chat_display.delete("1.0", tk.END)
+        self.chat_display.configure(state="disabled")
+        self.wypisz_w_oknie("SYSTEM", "Historia czatu wyczyszczona.", color="#FF4B4B")
+
+    # POPUP: Nowe ładne okno do nauki bota
+    def otworz_okno_nauki(self):
+        okno_nauki = ctk.CTkToplevel(self)
+        okno_nauki.title("Tryb Uczenia")
+        okno_nauki.geometry("400x250")
+        okno_nauki.configure(fg_color="#1F2833")
+        okno_nauki.attributes("-topmost", True)  # Żeby okno wyskoczyło na wierzch
+
+        lbl_klucz = ctk.CTkLabel(okno_nauki, text="Nowe słowo kluczowe (np. mclaren):", text_color="#66FCF1")
+        lbl_klucz.pack(pady=(15, 2))
+        entry_klucz = ctk.CTkEntry(okno_nauki, width=300, fg_color="#0B0C10", text_color="#C5C6C7")
+        entry_klucz.pack()
+
+        lbl_opis = ctk.CTkLabel(okno_nauki, text="Odpowiedź bota:", text_color="#66FCF1")
+        lbl_opis.pack(pady=(15, 2))
+        entry_opis = ctk.CTkEntry(okno_nauki, width=300, fg_color="#0B0C10", text_color="#C5C6C7")
+        entry_opis.pack()
+
+        def zapisz_nowy_wpis():
+            k = entry_klucz.get().lower().strip()
+            o = entry_opis.get().strip()
+            if k and o:
+                self.baza_wiedzy[k] = o
+                self.zapisz_baze()
+                self.info_label.configure(text=f"Baza haseł: {len(self.baza_wiedzy)}")
+                self.wypisz_w_oknie("SYSTEM", f"Pomyślnie dodano nowe hasło: '{k}'", color="#45A29E")
+                okno_nauki.destroy()
+
+        btn_zapisz = ctk.CTkButton(okno_nauki, text="Zapisz do bazy", fg_color="#45A29E", text_color="#0B0C10",
+                                   font=ctk.CTkFont(weight="bold"), command=zapisz_nowy_wpis)
+        btn_zapisz.pack(pady=25)
+
+
+if __name__ == "__main__":
+    app = ChatbotApp()
+    app.mainloop()  # Uruchomienie okienkowej pętli aplikacji
